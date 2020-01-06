@@ -1,0 +1,36 @@
+baseurl = "https://greyhawk.github.io"
+languageCode = "zh-cn"
+title = "银河系漫游指南"
+theme = "hugo-xmin"
+googleAnalytics = ""
+disqusShortname = ""
+ignoreFiles = ["\\.Rmd$", "\\.Rmarkdown$", "_files$", "_cache$"]
+footnotereturnlinkcontents = "↩"
+
+[permalinks]
+    post = "/post/:year/:month/:day/:slug/"
+    note = "/note/:year/:month/:day/:slug/"
+
+[[menu.main]]
+    name = "首页"
+    url = "/"
+    weight = 1
+[[menu.main]]
+    name = "关于"
+    url = "/about/"
+    weight = 2
+[[menu.main]]
+    name = "分类"
+    url = "/categories/"
+    weight = 3
+[[menu.main]]
+    name = "标签"
+    url = "/tags/"
+    weight = 4
+[[menu.main]]
+    name = "订阅"
+    url = "/index.xml"
+
+[params]
+    description = "银河系漫游指南"
+    footer = "&copy; [Greyhawk](https://greyhawk.github.io) 2019 -- 2020 | [Github](https://github.com/greyhawk)"
