@@ -1,0 +1,13 @@
+#+hugo_base_dir: /Users/ging/Codes/blog
+#+hugo_section: post
+
+#+hugo_weight: 2001
+#+hugo_auto_set_lastmod: t
+
+#+title: hadoop 3.x 概述
+#+date: 2020-01-06
+#+author: ging wu
+
+#+hugo_draft: true
+
+* Hadoop大数据平台
