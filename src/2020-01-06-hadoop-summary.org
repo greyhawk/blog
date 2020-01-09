@@ -3,6 +3,8 @@
 
 #+hugo_weight: 2001
 #+hugo_auto_set_lastmod: t
+#+hugo_draft: false
+#+hugo_tags: hadoop bigdata
 
 #+title: hadoop 3.x 概述
 #+date: 2020-01-06
@@ -10,4 +12,105 @@
 
 #+hugo_draft: true
 
-* Hadoop大数据平台
+* 实验环境安装
+首先安装好 Docker 环境，后续的学习都是通过 Docker 进行,完成 Docker 安装后，通过 git clone 以下项目
+#+begin_src shell
+git clone https://github.com/big-data-europe/docker-hadoop.git
+#+end_src
+
+进入目录
+#+begin_src shell
+cd docker-hadoop
+#+end_src
+
+通过 docker compose 启动容器
+#+begin_src shell
+docker-compose up -d
+#+end_src
+
+通过 docker compose 观察容器是否正常运行,如果有异常的容器，再执行一次启动容器
+#+begin_src shell
+docker-compose ps
+#+end_src
+
+现在 hadoop 伪分布环境已经运行起来了,后续我们会在该环境上做实验。接下来会介绍一下 hadoop 3 的架构
+
+* Hadoop 架构 
+Hadoop 主要由三个核心的组件构成 HDFS,MapReduce,YARN。HDFS作为分布式存储的基础解决方案，为所有的其他组件提供高可用、稳定而高效
+的数据存储服务。YARN作为资源的管理与调度框架，负责整个分布式集群资源的分配、动态调整、资源调度等，从而实现资源的高可用率。而 MapReduce
+是一种编程模式，主要用于大规模数据集（大于 1TB）的并行计算，Map（映射）、Reduce(归约)是其主要的思想。要学习 Hadoop 主要就从这三方面入手,
+了解 HDFS 的原理及操作,熟悉 MapReduce 的编程范式,最后理解 YARN 的资源管理和调度的核心思想。
+
+[[http://blog.ilibrary.me/assets/img/hadoop_architecture.png]]
+
+* HDFS 基础架构
+
+[[https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/images/hdfsarchitecture.png]]
+
+HDFS(Hadoop Distributed File System),是Hadoop的开源分布式文件系统，其设计思想源于谷歌的GFS论文，是GFS的开源实现。HDFS具有的优势如下:
+
++ 容量大，可扩展性强。由于节点众多，可以存储大量的数据，并且可以通过水平扩展增加数据节点的方式，增加容量
++ 高容错性，数据自动保存多个副本，某个副本丢失后，数据自动恢复，补上丢失的副本，并提供了回收站的功能，避免误操作删除数据
++ 高可用性，HDFS 可以通过QJM或NFS提供主节点的高可用性(HA)
++ 高稳定性, HDFS非常的稳定，单个从节点宕机不会对集群造成任何影响
++ 低成本, HDFS构建在廉价的主机上，和商用的存储方案相比，成本非常低廉
+
+
+HDFS本身的劣势如下:
++ 不适合存储小文件，由于块需要合适的大小(block),一般默认的块128M，所以不适合存储小文件
++ 不适合低延时访问, HDFS是为了大数据量读写的场景设计，因此通过牺牲低延迟换取高吞吐率，所以比较适合读写吞吐率比较高的场景，不适合要求快速响应的场景
++ 不允许并发写入，对修改不友好。并发写入在分布式环境下异常复杂，因此HDFS放弃了这一特性，并只允许追加和覆盖文件，不允许修改已有文件。
+
+HDFS主要组件是 NameNode, DataNode,我们可以看见之前搭建的Hadoop实验环境，启动的容器就有NamdeNode,DataNode,分别就是启动的这两个组件
+#+begin_src shell
+     Name                Command              State               Ports
+--------------------------------------------------------------------------------
+datanode          /entrypoint.sh /run.sh   Up (healthy)   9864/tcp
+historyserver     /entrypoint.sh /run.sh   Up (healthy)   8188/tcp
+namenode          /entrypoint.sh /run.sh   Up (healthy)   0.0.0.0:9870->9870/tcp
+nodemanager       /entrypoint.sh /run.sh   Up (healthy)   8042/tcp
+resourcemanager   /entrypoint.sh /run.sh   Up (healthy)   8088/tcp
+#+end_src
+
+** NameNode
+NameNode是HDFS的主节点，负责维护文件系统树，管理软件、目录、块等信息以及HDFS命名空间，协调并管理所有从节点，负责处理和调度客户端的读写请求
+在高可用的部署中，可以存在多个NameNode，其中一个是active状态，其他的是standby状态，在active节点宕机后，会自动切换到选举出的standby节点上。
+Hadoop主节点(NameNode)的HA部署挺复杂的，一个原因是Hadoop 1.x,Hadoop 2.x,Hadoop 3.x对高可用部署的方案各不相同，不同的版本有着完全不同的方案，
+下面我们将梳理一下各自版本对NameNode的高可用方案:
+
+*** Hadoop 1.x
+在Hadoop 1.x 版本下，NameNode是单点存在的，并没有高可用的版本(HA)，如果NameNode发生了故障，那么整个集群都会宕机，直到重新恢复NameNode以后，
+集群才能正常。而根据之前的介绍我们直到，NameNode维护的是整个文件系统树(FileSystem Tree)以及文件夹和文件的元数据(Metadata)，如果安装NameNode
+的主机硬盘坏了，NameNode维护的数据不可恢复了，那怎么重新恢复NameNode呢，因此在这个情况下，Hadoop 1.x 又提供了一系列的其他节点来进行主节点数据的
+维护。这些其他的节点由以下的组件构: SecondaryNameNode,CheckPointNode以及BackupNode。
+
++ SecondaryNameNode
+SecondaryNameNode并不是第二个NameNode,不是意味着NameNode宕机后，由SecondaryNameNode进行代替。SecondaryNameNode 并不是 Hadoop 第二个 NameNode，
+它不提供 NameNode 服务，而仅仅是 NameNode 的一个工具，帮助 NameNode 管理 Metadata 数据,一般情况下，当 NameNode 重启的时候，会合并硬盘上的 fsimage 文件
+和 edits 文件，得到完整的 Metadata 信息。但是，如果集群规模十分庞大，操作频繁，那么 edits 文件就会非常大，这个合并过程就会非常慢，导致 HDFS 长时间无法启动。
+如果定时将 edits 文件合并到 fsimage，那么重启 NameNode 就可以非常快，而 Secondary NameNode 就做这个合并的工作。
+Secondary 定期从 NameNode 获取元数据，获取元数据后，在本机把 edits 合并进 fsimage 中，完成合并后，将新的 fsimage 发送给 NameNode。NameNode 收到新的
+fsimage 后，会覆盖当前的 fsimage。因此只要有最新的 fsimage。 Hadoop 就可以恢复管理的元数据。
+[[http://zhang-jc.github.io/uploads/20170108/secondarynamenode.png]]
+
++ CheckPointNode
+SecondaryNameNode 名字极具误导性，第一次见的都会误认为是 NameNode 的替代，所以在1.0.4版本后，加了一个 CheckPointNode 作用跟 SecondaryNameNode 完全一样
+
++ BackupNode
+SecondaryNameNode 和 CheckPointNode 都是定期从 NameNode 获取元数据，并在本机进行合并，合并的过程并不能说很高效，并且快照时间也存在延迟，就跟魔兽世界服务器挤爆
+回档一个道理，恢复的数据不是最新的，而是之前某个时间节点的版本。因此 Hadoop 又增加了一个组件叫做 BackupNode， BackupNode 是在内存中维护了一份从 NameNode 同步
+过来的 fsimage, 同时它还从 NameNode 实时接收 edits 文件的日志流,并把它们持久化硬盘, BackupNode 会把收到的这些 edits 文件和内存中的 fsimage 文件进行合并，创建
+一份元数据备份。我们可以看见元数据备份从定期变成实时，从磁盘合并变成内存合并，因此 BackupNode 的实时性和合并效率都要比 CheckPointNode 高。所以后续的版本基本都会使用
+BackupNode 作元数据的备份。
+
+*** fsimage 和 editlog
+
+上面介绍 NameNode 维护的元数据的时候，屡次提到 fsimage 和 editlog 文件，我们就先介绍一下这两类文件：
++ fsimage
+根据名称目测，我们大概能知道这是文件系统的镜像,fsimage 保存了最新的元数据检查点，包含了整个 HDFS 文件系统的所有目录和文件的信息，对于文件来说包含了数据块的描述信息、修改时间、
+访问时间等，对于目录来说包括修改时间、访问权限控制等。在 NameNode 启动的时候，就会加载最近的 fsimage 。
++ editlog
+NameNode 启动后，HDFS 客户端执行的所有写操作都会被记录进 editlog 里面，再周期性的合并成新的 fsimage 文件。
+
+*** Hadoop 2.x
+Hadoop 2.x NameNode 就提供了高可用(HA)的架构。
