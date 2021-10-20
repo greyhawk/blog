@@ -113,4 +113,9 @@ BackupNode 作元数据的备份。
 NameNode 启动后，HDFS 客户端执行的所有写操作都会被记录进 editlog 里面，再周期性的合并成新的 fsimage 文件。
 
 *** Hadoop 2.x
-Hadoop 2.x NameNode 就提供了高可用(HA)的架构。
+Hadoop 2.x NameNode 提供了高可用(HA)的架构,下图是 NameNode 高可用的整体架构。
+
+[[https://www.ibm.com/developerworks/cn/opensource/os-cn-hadoop-name-node/img001.png]]
+
+从上图中，我们可以看见高可用的整体架构主要分为以下几个部分
+
